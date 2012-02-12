@@ -48,6 +48,18 @@ class FileMode:
         return self._selbits("S_ISVTX S_IROTH S_IWOTH S_IXOTH")
 
     @property
+    def world(self):
+        return self.other
+
+    @property
+    def setuid(self):
+        return self._selbits("S_ISUID")
+    
+    @property
+    def setgid(self):
+        return self._selbits("S_ISGID")
+
+    @property
     def read(self):
         return self._selbits("S_IRUSR S_IRGRP S_IROTH")
     
@@ -70,56 +82,49 @@ class FileMode:
                       m & stat.S_ISVTX, "t")
         return "<%04o %s>" % (self.mode, modestr)
 
-class Path:
-    def __init__(self, path, rest = None):
-        if isinstance(path, Path):
-            path = path.path
-        if isinstance(rest, Path):
+class path(object):
+    def __init__(self, p, rest = None):
+        if isinstance(p, path):
+            p = p.path
+        if isinstance(rest, path):
             rest = rest.path
         if rest is not None:
-            path = os.path.join(path, rest)
-        self.path = os.path.normpath(path)
+            p = os.path.join(p, rest)
+        self.path = os.path.normpath(p)
         
     def __div__(self, other):
-        return Path(self.path, other)
+        return path(self.path, other)
     def __truediv__(self, other):
-        return Path(self.path, other)
+        return path(self.path, other)
     def __rdiv__(self, other):
-        return Path(other, self.path)
+        return path(other, self.path)
     def __rtruediv__(self, other):
-        return Path(other, self.path)
+        return path(other, self.path)
 
     def __mod__(self, other):
         return self.relative_to(other)
 
     def __rmod__(self, other):
-        return Path.to_path(other).relative_to(self)
+        return path(other).relative_to(self)
 
-    #cwd = Path(".")
+    #cwd = path(".")
         
-    @staticmethod
-    def to_path(path):
-        if isinstance(path, Path):
-            return path
-        else:
-            return Path(path)
-
     def relative_to(self, p):
-        p = Path.to_path(p)
+        p = path(p)
         if not (p.is_absolute and self.is_absolute):
             raise Exception()
-        return Path(os.path.relpath(self.path, p.path))
+        return path(os.path.relpath(self.path, p.path))
 
     def __iter__(self):
         for i in os.listdir(self.path):
             yield self[i]
 
     def __getitem__(self, dirent):
-        return Path(self.path, dirent)
+        return path(self.path, dirent)
 
     def __eq__(self, other):
         ## FIXME!!!
-        return self.path == Path.to_path(other).path
+        return self.path == path(other).path
 
     def __repr__(self):
         last_bad_path = None
@@ -151,15 +156,23 @@ class Path:
     
     @property
     def parent(self):
-        return Path(os.path.dirname(self.path))
+        return path(os.path.dirname(self.path))
 
     @property
     def basename(self):
         return os.path.basename(self.path)
 
     @property
+    def extension(self):
+        return os.path.splitext(self.path)[1]
+
+    @property
+    def drive(self):
+        return os.path.splitdrive(self.path)[0]
+
+    @property
     def realpath(self):
-        return Path(os.path.abspath(self.path))
+        return path(os.path.abspath(self.path))
     
 
     @property
@@ -176,7 +189,7 @@ class Path:
                 break
             else:
                 p = newp
-                parts.append(Path(p))
+                parts.append(path(p))
         return parts
 
     def type(self, statres):
@@ -205,7 +218,6 @@ class Path:
 
     @property
     def is_file(self):
-        '''asdf'''
         return os.path.isfile(self.path)
 
     @property
@@ -213,15 +225,15 @@ class Path:
         return os.path.islink(self.path)
 
     @property
-    def atime(self):
+    def last_access_time(self):
         return datetime.datetime.fromtimestamp(os.path.getatime(self.path))
 
     @property
-    def mtime(self):
+    def last_modify_time(self):
         return datetime.datetime.fromtimestamp(os.path.getmtime(self.path))
 
     @property
-    def ctime(self):
+    def last_metadata_change_time(self):
         return datetime.datetime.fromtimestamp(os.path.getctime(self.path))        
 
     @property
@@ -250,7 +262,7 @@ class Path:
 
     @property
     def link_target(self):
-        return Path(os.readlink(self.path))
+        return path(os.readlink(self.path))
 
     @property
     def final_link_target(self):
@@ -274,11 +286,11 @@ class Path:
             raise OSError("Neither a file or directory: %s" % self.path)
 
     def newer_than(self, other):
-        other = Path.to_path(other)
+        other = path(other)
         return other.mtime < self.mtime
 
     def older_than(self, other):
-        other = Path.to_path(other)
+        other = path(other)
         return self.mtime < other.mtime
 
     @property
@@ -299,7 +311,7 @@ class Path:
 
 
     def glob(self, pattern):
-        return map(Path, glob.glob(os.path.join(self.path, pattern)))
+        return map(path, glob.glob(os.path.join(self.path, pattern)))
 
     def remove(self, recurse=False):
         if self.is_directory:
@@ -312,23 +324,23 @@ class Path:
 
     def rename_to(self, newpath):
         # FIXME rel names, short names, slash-less newpaths
-        newpath = Path.to_path(newpath)
+        newpath = path(newpath)
         os.rename(self.path, newpath.path)
         return newpath
 
     def symlink(self, linkpath):
-        linkpath = Path.to_path(linkpath)
+        linkpath = path(linkpath)
         os.symlink(self.path, linkpath.path)
         return linkpath
 
     def hardlink(self, linkpath):
-        linkpath = Path.to_path(linkpath)
+        linkpath = path(linkpath)
         os.link(self.path, linkpath.path)
         return linkpath
 
     def mkdir(self, name = None, recurse_up = False):
         if name is not None:
-            p = Path(os.path.join(self.path, name))
+            p = path(os.path.join(self.path, name))
         else:
             p = self
         if recurse_up:
@@ -358,10 +370,10 @@ class Path:
         
 
     def open(self, mode="rb"):
-        return open(self.path, mode)
+        return filehandle(open(self.path, mode))
 
     def write(self, contents):
-        f = self.open("w")
+        f = self.open("w+")
         f.write(str(contents))
         f.close()
 
@@ -376,29 +388,29 @@ class Path:
         f.close()
         return s
 
+    contents = property(read, write)
+
 
     @contextmanager
     def atomic_update(self):
         if not self.is_file:
             raise Exception()
         try:
-            fd, path = tempfile.mkstemp(dir = self.parent.path,
-                                        prefix = ".tmp",
-                                        suffix = ".%d" % os.getpid())
+            fd, p = tempfile.mkstemp(dir = self.parent.path,
+                                     prefix = ".tmp",
+                                     suffix = ".%d" % os.getpid())
             fd = os.fdopen(fd, "w+b")
-            path = Path(path)
+            p = path(p)
             yield fd
             fd.close()
-            path.rename_to(self)
+            p.rename_to(self)
         finally:
             fd.close()
-            if path.exists:
-                path.remove()
+            if p.exists:
+                p.remove()
 
     def chdir(self):
         os.chdir(self.path)
-
-    contents = property(read, write)
 
 
     def adv_patterns(self, patterns, name):
@@ -499,7 +511,7 @@ class Path:
             pat = ["**"] + pat
         return tuple(pat)
 
-    def walk(self, include="**", exclude=[], ignore_case = False, visit_dirs = 'before', max_depth = 1000):
+    def find(self, include="**", exclude=[], ignore_case = False, visit_dirs = 'before', max_depth = 1000):
         if isinstance(include, basestring) or callable(include):
             include = [include]
         if isinstance(exclude, basestring) or callable(exclude):
@@ -550,7 +562,7 @@ class Path:
 
 
 
-class File(object):
+class filehandle(object):
     def __init__(self, fileobj):
         self.fileobj = fileobj
         self.auto_flush = True
@@ -576,6 +588,9 @@ class File(object):
 
     def skip(self, n):
         self.fileobj.seek(n, os.SEEK_CUR)
+
+    def close(self):
+        self.fileobj.close()
 
     def _slicerange(self, item):
         if not isinstance(item, slice) or item.step not in [None,1]:
