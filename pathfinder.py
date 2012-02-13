@@ -370,7 +370,7 @@ class path(object):
         
 
     def open(self, mode="rb"):
-        return filehandle(open(self.path, mode))
+        return filehandle(open(self.path, mode), self)
 
     def write(self, contents):
         f = self.open("w+")
@@ -563,9 +563,10 @@ class path(object):
 
 
 class filehandle(object):
-    def __init__(self, fileobj):
+    def __init__(self, fileobj, path = None):
         self.fileobj = fileobj
         self.auto_flush = True
+        self.path = path
 
     @property
     def pos(self):
@@ -646,6 +647,18 @@ class filehandle(object):
         data = self.read(length)
         self.pos = oldpos
         return data
+
+    def isatty(self):
+        return self.fileobj.isatty()
+
+    @property
+    def closed(self):
+        return self.fileobj.closed
+
+    @property
+    def name(self):
+        return self.path.path
+
 
     def __setitem__(self, item, data):
         if item == Ellipsis:
