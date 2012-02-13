@@ -93,7 +93,7 @@ symlinks, path.link_target shows where they point, and
 path.final_link_target follows as many steps are necessary to get to
 the end of a chain of symlinks.
 
-    >>> if path('README.markdown).newer_than(path('pathfinder.py')):
+    >>> if path('README.markdown').newer_than(path('pathfinder.py')):
     ...     print "whatever the hell you just did, document it!"
 
 You can modify the filesystem with path.mkdir(), path.symlink(),
@@ -206,8 +206,8 @@ os.walk and the deeply unpleasant os.path.walk.
 
 * include specifies what to search for, as a list of string
 patterns. The patterns can contain wildcards: "?" matches any
-single character, "*" any sequence of characters and "**" any sequence
-of directorys. So, the pattern "coding/\*/\*.html" matches
+single character, "\*" any sequence of characters and "\*\*" any sequence
+of directories. So, the pattern "coding/\*/\*.html" matches
 "coding/project1/info.html" but not "coding/project1/docs/help.html",
 while "coding/\*\*/\*.html" matches both. Patterns may also be specified
 as callables, which will be invoked to determine whether a file is
